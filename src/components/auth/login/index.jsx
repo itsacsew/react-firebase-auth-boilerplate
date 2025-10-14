@@ -11,12 +11,59 @@ const Login = () => {
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
 
+    const validateForm = () => {
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!email) {
+            setErrorMessage('Email is required')
+            return false
+        }
+        if (!emailRegex.test(email)) {
+            setErrorMessage('Please enter a valid email address')
+            return false
+        }
+
+        // Password validation
+        if (!password) {
+            setErrorMessage('Password is required')
+            return false
+        }
+        if (password.length < 6) {
+            setErrorMessage('Password must be at least 6 characters long')
+            return false
+        }
+
+        setErrorMessage('')
+        return true
+    }
+
     const onSubmit = async (e) => {
         e.preventDefault()
+        
+        if (!validateForm()) {
+            return
+        }
+
         if(!isSigningIn) {
             setIsSigningIn(true)
-            await doSignInWithEmailAndPassword(email, password)
-            // doSendEmailVerification()
+            try {
+                await doSignInWithEmailAndPassword(email, password)
+                // doSendEmailVerification()
+            } catch (error) {
+                setIsSigningIn(false)
+                // Handle Firebase authentication errors
+                if (error.code === 'auth/invalid-credential') {
+                    setErrorMessage('Invalid email or password')
+                } else if (error.code === 'auth/user-not-found') {
+                    setErrorMessage('No account found with this email')
+                } else if (error.code === 'auth/wrong-password') {
+                    setErrorMessage('Invalid password')
+                } else if (error.code === 'auth/invalid-email') {
+                    setErrorMessage('Invalid email format')
+                } else {
+                    setErrorMessage('Failed to sign in. Please try again.')
+                }
+            }
         }
     }
 
@@ -26,6 +73,7 @@ const Login = () => {
             setIsSigningIn(true)
             doSignInWithGoogle().catch(err => {
                 setIsSigningIn(false)
+                setErrorMessage('Failed to sign in with Google')
             })
         }
     }
@@ -53,11 +101,14 @@ const Login = () => {
                                 type="email"
                                 autoComplete='email'
                                 required
-                                value={email} onChange={(e) => { setEmail(e.target.value) }}
+                                value={email} onChange={(e) => { 
+                                    setEmail(e.target.value)
+                                    // Clear error when user starts typing
+                                    if (errorMessage) setErrorMessage('')
+                                }}
                                 className="w-full mt-2 px-3 py-2 text-gray-500 bg-transparent outline-none border focus:border-indigo-600 shadow-sm rounded-lg transition duration-300"
                             />
                         </div>
-
 
                         <div>
                             <label className="text-sm text-gray-600 font-bold">
@@ -67,13 +118,17 @@ const Login = () => {
                                 type="password"
                                 autoComplete='current-password'
                                 required
-                                value={password} onChange={(e) => { setPassword(e.target.value) }}
+                                value={password} onChange={(e) => { 
+                                    setPassword(e.target.value)
+                                    // Clear error when user starts typing
+                                    if (errorMessage) setErrorMessage('')
+                                }}
                                 className="w-full mt-2 px-3 py-2 text-gray-500 bg-transparent outline-none border focus:border-indigo-600 shadow-sm rounded-lg transition duration-300"
                             />
                         </div>
 
                         {errorMessage && (
-                            <span className='text-red-600 font-bold'>{errorMessage}</span>
+                            <span className='text-red-600 font-bold text-sm block text-center'>{errorMessage}</span>
                         )}
 
                         <button
