@@ -1,18 +1,34 @@
-import React, { useState } from 'react'
+// components/auth/login/index.jsx
+import React, { useState, useEffect } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { doSignInWithEmailAndPassword, doSignInWithGoogle } from '../../../firebase/auth'
 import { useAuth } from '../../../contexts/authContext'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../../../firebase/firebase'
 
 const Login = () => {
-    const { userLoggedIn } = useAuth()
-
+    const { userLoggedIn, currentUser } = useAuth()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [isSigningIn, setIsSigningIn] = useState(false)
     const [errorMessage, setErrorMessage] = useState('')
+    const [userRole, setUserRole] = useState(null)
+
+    // Function to get user role from Firestore
+    const getUserRole = async (userId) => {
+        try {
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) {
+                return userDoc.data().role;
+            }
+            return 'user'; // default role
+        } catch (error) {
+            console.error("Error getting user role:", error);
+            return 'user';
+        }
+    };
 
     const validateForm = () => {
-        // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!email) {
             setErrorMessage('Email is required')
@@ -22,8 +38,6 @@ const Login = () => {
             setErrorMessage('Please enter a valid email address')
             return false
         }
-
-        // Password validation
         if (!password) {
             setErrorMessage('Password is required')
             return false
@@ -32,7 +46,6 @@ const Login = () => {
             setErrorMessage('Password must be at least 6 characters long')
             return false
         }
-
         setErrorMessage('')
         return true
     }
@@ -48,9 +61,10 @@ const Login = () => {
             setIsSigningIn(true)
             try {
                 await doSignInWithEmailAndPassword(email, password)
-                // doSendEmailVerification()
+                console.log('✅ User logged in successfully:', email);
             } catch (error) {
                 setIsSigningIn(false)
+                console.error('❌ Login error:', error.code, '-', error.message);
                 // Handle Firebase authentication errors
                 if (error.code === 'auth/invalid-credential') {
                     setErrorMessage('Invalid email or password')
@@ -67,20 +81,62 @@ const Login = () => {
         }
     }
 
-    const onGoogleSignIn = (e) => {
+    const onGoogleSignIn = async (e) => {
         e.preventDefault()
         if (!isSigningIn) {
             setIsSigningIn(true)
-            doSignInWithGoogle().catch(err => {
+            try {
+                await doSignInWithGoogle()
+                console.log('✅ User logged in with Google successfully');
+            } catch (err) {
                 setIsSigningIn(false)
+                console.error('❌ Google login error:', err);
                 setErrorMessage('Failed to sign in with Google')
-            })
+            }
+        }
+    }
+
+    // Check user role after login and redirect accordingly
+    useEffect(() => {
+        const checkUserRoleAndRedirect = async () => {
+            if (userLoggedIn && currentUser) {
+                // Get role directly from Firestore
+                const role = await getUserRole(currentUser.uid);
+                setUserRole(role);
+                
+                console.log('🔍 User Role Check:');
+                console.log('   Email:', currentUser.email);
+                console.log('   UID:', currentUser.uid);
+                console.log('   Role:', role);
+                console.log('   Redirecting to:', role === 'admin' ? '/home' : role === 'reader' ? '/reader' : '/users');
+            }
+        };
+
+        if (userLoggedIn) {
+            checkUserRoleAndRedirect();
+        }
+    }, [userLoggedIn, currentUser]);
+
+    // Redirect based on role
+    if (userLoggedIn && userRole) {
+        console.log('🔄 Redirecting user:', currentUser?.email, 'with role:', userRole);
+        
+        if (userRole === 'admin' || email === 'mto_bill@gmail.com') {
+            return <Navigate to="/home" replace={true} />;
+        } else if (userRole === 'reader') {
+            return <Navigate to="/reader" replace={true} />;
+        } else {
+            return <Navigate to="/users" replace={true} />;
         }
     }
 
     return (
         <div>
-            {userLoggedIn && (<Navigate to={'/home'} replace={true} />)}
+            {userLoggedIn && !userRole && (
+                <div className="flex justify-center items-center">
+                    <p>Loading...</p>
+                </div>
+            )}
 
             <main className="w-full h-screen flex self-center place-content-center place-items-center">
                 <div className="w-96 text-gray-600 space-y-5 p-4 shadow-xl border rounded-xl">
@@ -139,10 +195,11 @@ const Login = () => {
                             {isSigningIn ? 'Signing In...' : 'Sign In'}
                         </button>
                     </form>
-                    <p className="text-center text-sm">Don't have an account? <Link to={'/register'} className="hover:underline font-bold">Sign up</Link></p>
+                    
                     <div className='flex flex-row text-center w-full'>
                         <div className='border-b-2 mb-2.5 mr-2 w-full'></div><div className='text-sm font-bold w-fit'>OR</div><div className='border-b-2 mb-2.5 ml-2 w-full'></div>
                     </div>
+                    
                     <button
                         disabled={isSigningIn}
                         onClick={(e) => { onGoogleSignIn(e) }}
@@ -162,6 +219,19 @@ const Login = () => {
                         </svg>
                         {isSigningIn ? 'Signing In...' : 'Continue with Google'}
                     </button>
+
+                    {/* ADDED: Sign Up Link */}
+                    <div className="text-center pt-4 border-t">
+                        <p className="text-sm text-gray-600">
+                            Don't have an account?{' '}
+                            <Link 
+                                to="/register" 
+                                className="text-indigo-600 hover:text-indigo-700 font-bold underline transition duration-300"
+                            >
+                                Sign Up Here
+                            </Link>
+                        </p>
+                    </div>
                 </div>
             </main>
         </div>

@@ -1,3 +1,4 @@
+//contexts/authContext/index.js
 import React, { useContext, useState, useEffect } from "react";
 import { auth } from "../../firebase/firebase";
 // import { GoogleAuthProvider } from "firebase/auth";
@@ -37,15 +38,16 @@ export function AuthProvider({ children }) {
     //     (provider) => provider.providerId === GoogleAuthProvider.PROVIDER_ID
     //   );
     //   setIsGoogleUser(isGoogle);
-
-      setUserLoggedIn(true);
-    } else {
-      setCurrentUser(null);
-      setUserLoggedIn(false);
-    }
-
-    setLoading(false);
+    setUserLoggedIn(true);
+    console.log('🔐 User initialized from Firebase auth state:', user.email);
+  } else {
+    setCurrentUser(null);
+    setUserLoggedIn(false);
+    console.log('🔐 No user in Firebase auth state');
   }
+
+  setLoading(false);
+}
 
   const value = {
     userLoggedIn,
